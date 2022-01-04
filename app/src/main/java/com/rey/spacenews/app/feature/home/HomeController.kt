@@ -9,10 +9,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,8 +83,10 @@ class HomeController : Controller(), KoinComponent {
 
     @Composable
     fun articleList(items: Flow<List<Item>>) {
+        val listState = rememberLazyListState()
         val itemState = items.collectAsState(initial = emptyList())
-        LazyColumn(modifier = Modifier.fillMaxHeight()) {
+
+        LazyColumn(modifier = Modifier.fillMaxHeight(), state = listState) {
             items(itemState.value, key = { it.id }) { item ->
                 Modifier.fillParentMaxHeight()
                 when (item) {
@@ -103,6 +105,17 @@ class HomeController : Controller(), KoinComponent {
                     )
                 }
             }
+        }
+        val loadMoreReached by remember {
+            derivedStateOf {
+                val lastIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                lastIndex >= listState.layoutInfo.totalItemsCount - 3 && lastIndex > 1
+            }
+        }
+
+        LaunchedEffect(loadMoreReached) {
+            if(loadMoreReached)
+                store.dispatch(LoadMoreCommand)
         }
     }
 
@@ -178,7 +191,8 @@ class HomeController : Controller(), KoinComponent {
                             .align(Alignment.End),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        text = publishedDateTime.withZoneSameInstant(ZoneId.systemDefault()).format(dateTimeFormatter),
+                        text = publishedDateTime.withZoneSameInstant(ZoneId.systemDefault())
+                            .format(dateTimeFormatter),
                         style = MaterialTheme.typography.caption
                     )
                 }

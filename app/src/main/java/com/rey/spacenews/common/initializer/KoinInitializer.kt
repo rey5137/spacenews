@@ -1,22 +1,25 @@
 package com.rey.spacenews.common.initializer
 
-import android.app.Application
+import android.content.Context
+import androidx.startup.Initializer
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import org.koin.core.module.Module
 
-class KoinInitializer(vararg modules: Module) : Initializer() {
+open class KoinInitializer(vararg modules: Module) : Initializer<Unit> {
 
     private val modules: List<Module> = listOf(*modules)
 
-    override fun doInit(app: Application) {
+    override fun create(context: Context) {
         startKoin {
             androidLogger(Level.ERROR)
-            androidContext(app)
+            androidContext(context)
             modules(modules)
         }
     }
+
+    override fun dependencies(): List<Class<out Initializer<*>>> = emptyList()
 
 }

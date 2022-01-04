@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlin.coroutines.CoroutineContext
 
+private const val PAGE_SIZE = 10
+
 class HomeStore(
     private val repository: NewsRepository,
     scope: CoroutineScope,
@@ -25,16 +27,14 @@ class HomeStore(
     logger = TimberStoreLogger()
 ) {
 
-    private val pageSize = 30
-
     override fun processCommand(command: HomeScreenCommand): Flow<HomeScreenEvent> {
-        return when(command) {
+        return when (command) {
             is LoadMoreCommand -> flow {
                 val state = states.value
-                if(!state.loading) {
+                if (!state.loading) {
                     val page = state.page + 1
                     emit(ArticleLoadingEvent(page))
-                    emit(ArticleLoadedEvent(page, repository.getArticles(page = page, pageSize)))
+                    emit(ArticleLoadedEvent(page, repository.getArticles(page = page, PAGE_SIZE)))
                 }
             }.flowOn(Dispatchers.IO)
         }
@@ -45,21 +45,44 @@ class HomeStore(
 class HomeReducer : Reducer<HomeScreenEvent, HomeScreenState> {
 
     override fun reduce(oldState: HomeScreenState, event: HomeScreenEvent): HomeScreenState {
-        return when(event) {
-            is ArticleLoadingEvent -> oldState.copy(loading = true, items = oldState.items.addLoading(event.page))
-            is ArticleLoadedEvent -> oldState.copy(loading = false, items = oldState.items.addArticles(event.articles))
+        return when (event) {
+            is ArticleLoadingEvent -> if (oldState.hasMore) oldState.copy(
+                loading = true,
+                items = oldState.items.addLoading(event.page == 0)
+            ) else oldState
+            is ArticleLoadedEvent -> {
+                val hasMore = event.articles.size == PAGE_SIZE
+                val ids = oldState.articleIds.toMutableSet()
+                val articles = event.articles.filter { !ids.contains(it.id) }
+                    .onEach { ids.add(it.id) }
+                oldState.copy(
+                    loading = false,
+                    page = event.page,
+                    items = oldState.items.addArticles(articles, hasMore),
+                    articleIds = ids.toSet(),
+                    hasMore = hasMore,
+                )
+            }
         }
     }
 
-    private fun List<Item>.addLoading(page: Int) : List<Item> {
-        if(page == 0)
-            return listOf(LoadingItem(page))
-        return this.filterIsInstance<ArticleItem>() + LoadingItem(page)
+    private fun List<Item>.addLoading(firstTime: Boolean): List<Item> {
+        val item = this.find { it is LoadingItem } as LoadingItem?
+        return if (item == null || item.firstTime != firstTime) {
+            if (firstTime)
+                listOf(LoadingItem(true))
+            else
+                this.filterIsInstance<ArticleItem>() + LoadingItem(false)
+        } else
+            this
     }
 
-    private fun List<Item>.addArticles(articles: List<Article>) : List<Item> {
-        val items = this.filterIsInstance<ArticleItem>().toMutableList()
+    private fun List<Item>.addArticles(articles: List<Article>, addLoading: Boolean): List<Item> {
+        val items = mutableListOf<Item>()
+        items.addAll(this.filterIsInstance<ArticleItem>())
         articles.map { ArticleItem(it) }.forEach { items.add(it) }
+        if (addLoading)
+            items.add(LoadingItem(false))
         return items
     }
 

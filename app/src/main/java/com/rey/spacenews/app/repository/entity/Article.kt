@@ -1,6 +1,7 @@
 package com.rey.spacenews.app.repository.entity
 
-import org.joda.time.LocalDateTime
+import java.time.ZonedDateTime
+
 
 data class Article(
     val id: Int,
@@ -9,6 +10,6 @@ data class Article(
     val image: String,
     val site: String,
     val summary: String,
-    val publishedDateTime: LocalDateTime,
-    val updatedDateTime: LocalDateTime,
+    val publishedDateTime: ZonedDateTime,
+    val updatedDateTime: ZonedDateTime,
 )

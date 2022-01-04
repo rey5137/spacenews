@@ -3,9 +3,10 @@ package com.rey.spacenews.common.mvs
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 abstract class Store<C : Command, E : Event, S : State>(
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     context: CoroutineContext = Dispatchers.Default,
     initialState: S,
     reducer: Reducer<E, S>,
@@ -27,8 +28,8 @@ abstract class Store<C : Command, E : Event, S : State>(
 
     protected open fun processCommand(command: C): Flow<E> = emptyFlow()
 
-    suspend fun dispatch(command: C) {
-        commandFlow.emit(command)
+    fun dispatch(command: C, context: CoroutineContext = EmptyCoroutineContext) {
+        scope.launch(context = context) { commandFlow.emit(command) }
     }
 }
 

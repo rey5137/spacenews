@@ -8,4 +8,5 @@ data class HomeScreenState(
     val items: List<Item> = emptyList(),
     val articleIds: Set<Int> = emptySet(),
     val hasMore: Boolean = true,
+    val isRefreshing: Boolean = false,
 ) : State

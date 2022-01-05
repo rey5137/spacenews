@@ -4,6 +4,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,15 +27,15 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import com.bluelinelabs.conductor.Controller
-import com.rey.spacenews.app.feature.home.contract.ArticleItem
-import com.rey.spacenews.app.feature.home.contract.Item
-import com.rey.spacenews.app.feature.home.contract.LoadMoreCommand
-import com.rey.spacenews.app.feature.home.contract.LoadingItem
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import com.rey.spacenews.app.feature.home.contract.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -44,6 +48,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 
+@ExperimentalMaterialApi
 class HomeController : Controller(), KoinComponent {
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -57,9 +62,10 @@ class HomeController : Controller(), KoinComponent {
         savedViewState: Bundle?
     ): View {
         val items = store.states.map { it.items }
+        val isRefreshing = store.states.map { it.isRefreshing }.distinctUntilChanged()
         val view = ComposeView(container.context).apply {
             setContent {
-                homeScreen(items)
+                homeScreen(items, isRefreshing)
             }
         }
         store.dispatch(LoadMoreCommand)
@@ -71,38 +77,44 @@ class HomeController : Controller(), KoinComponent {
     }
 
     @Composable
-    fun homeScreen(items: Flow<List<Item>>) {
+    fun homeScreen(items: Flow<List<Item>>, isRefreshing: Flow<Boolean>) {
         MaterialTheme {
             Scaffold { contentPadding ->
                 Box(modifier = Modifier.padding(contentPadding)) {
-                    articleList(items)
+                    articleList(items, isRefreshing)
                 }
             }
         }
     }
 
     @Composable
-    fun articleList(items: Flow<List<Item>>) {
+    fun articleList(items: Flow<List<Item>>, isRefreshing: Flow<Boolean>) {
         val listState = rememberLazyListState()
         val itemState = items.collectAsState(initial = emptyList())
+        val refreshingState by isRefreshing.collectAsState(initial = false)
 
-        LazyColumn(modifier = Modifier.fillMaxHeight(), state = listState) {
-            items(itemState.value, key = { it.id }) { item ->
-                Modifier.fillParentMaxHeight()
-                when (item) {
-                    is LoadingItem -> loadingItem(
-                        itemModifier = if (item.firstTime) Modifier.fillParentMaxHeight()
-                        else Modifier.height(96.dp),
-                        indicatorModifier = if (item.firstTime) Modifier.size(64.dp)
-                        else Modifier.size(48.dp)
-                    )
-                    is ArticleItem -> articleItem(
-                        id = item.article.id,
-                        title = item.article.title,
-                        image = item.article.image,
-                        site = item.article.site,
-                        publishedDateTime = item.article.publishedDateTime,
-                    )
+        SwipeRefresh(
+            state = rememberSwipeRefreshState(refreshingState),
+            onRefresh = { store.dispatch(RefreshCommand) },
+        ) {
+            LazyColumn(modifier = Modifier.fillMaxHeight(), state = listState) {
+                items(itemState.value, key = { it.id }) { item ->
+                    Modifier.fillParentMaxHeight()
+                    when (item) {
+                        is LoadingItem -> loadingItem(
+                            itemModifier = if (item.firstTime) Modifier.fillParentMaxHeight()
+                            else Modifier.height(96.dp),
+                            indicatorModifier = if (item.firstTime) Modifier.size(64.dp)
+                            else Modifier.size(48.dp)
+                        )
+                        is ArticleItem -> articleItem(
+                            id = item.article.id,
+                            title = item.article.title,
+                            image = item.article.image,
+                            site = item.article.site,
+                            publishedDateTime = item.article.publishedDateTime,
+                        )
+                    }
                 }
             }
         }
@@ -114,7 +126,7 @@ class HomeController : Controller(), KoinComponent {
         }
 
         LaunchedEffect(loadMoreReached) {
-            if(loadMoreReached)
+            if (loadMoreReached)
                 store.dispatch(LoadMoreCommand)
         }
     }
@@ -139,10 +151,10 @@ class HomeController : Controller(), KoinComponent {
     ) {
         Card(
             modifier = Modifier
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
-                .clickable { Timber.d("asd click $id") },
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp),
             shape = RoundedCornerShape(8.dp),
-            elevation = 4.dp
+            elevation = 4.dp,
+            onClick = { Timber.d("asd click $id") }
         ) {
             Row(modifier = Modifier.height(IntrinsicSize.Min)) {
                 Image(
@@ -178,6 +190,7 @@ class HomeController : Controller(), KoinComponent {
                     Text(
                         modifier = Modifier
                             .wrapContentWidth(Alignment.Start)
+                            .weight(1f)
                             .padding(top = 8.dp),
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,

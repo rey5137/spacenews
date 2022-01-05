@@ -119,6 +119,12 @@ object Libs {
         const val TEST = "$domain.ui:ui-test-junit4:$VERSION"
     }
 
+    object Accompanist {
+        private const val domain = "com.google.accompanist"
+        const val VERSION = "0.20.3"
+        const val SWIPE_REFRESH = "$domain:accompanist-swiperefresh:$VERSION"
+    }
+
     object Conductor {
         private const val domain = "com.bluelinelabs"
         private const val VERSION = "3.1.2"

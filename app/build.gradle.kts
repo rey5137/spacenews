@@ -70,6 +70,7 @@ dependencies {
     implementation(Libs.ComposeUI.MATERIAL_ICONS)
     implementation(Libs.ComposeUI.MATERIAL_ICONS_EXTENDED)
     implementation(Libs.ComposeUI.ACTIVITY)
+    implementation(Libs.Accompanist.SWIPE_REFRESH)
 
     implementation(Libs.Conductor.CORE)
     implementation(Libs.Common.TIMBER)

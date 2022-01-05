@@ -33,8 +33,21 @@ class HomeStore(
                 val state = states.value
                 if (!state.loading) {
                     val page = state.page + 1
-                    emit(ArticleLoadingEvent(page))
-                    emit(ArticleLoadedEvent(page, repository.getArticles(page = page, PAGE_SIZE)))
+                    emit(ArticleLoadingEvent(page, false))
+                    emit(
+                        ArticleLoadedEvent(
+                            page,
+                            false,
+                            repository.getArticles(page = page, PAGE_SIZE)
+                        )
+                    )
+                }
+            }.flowOn(Dispatchers.IO)
+            is RefreshCommand -> flow {
+                val state = states.value
+                if (!state.isRefreshing) {
+                    emit(ArticleLoadingEvent(0, true))
+                    emit(ArticleLoadedEvent(0, true, repository.getArticles(page = 0, PAGE_SIZE)))
                 }
             }.flowOn(Dispatchers.IO)
         }
@@ -46,22 +59,40 @@ class HomeReducer : Reducer<HomeScreenEvent, HomeScreenState> {
 
     override fun reduce(oldState: HomeScreenState, event: HomeScreenEvent): HomeScreenState {
         return when (event) {
-            is ArticleLoadingEvent -> if (oldState.hasMore) oldState.copy(
-                loading = true,
-                items = oldState.items.addLoading(event.page == 0)
-            ) else oldState
+            is ArticleLoadingEvent -> {
+                when {
+                    event.refreshing -> oldState.copy(isRefreshing = true)
+                    oldState.hasMore -> oldState.copy(
+                        loading = true,
+                        items = oldState.items.addLoading(event.page == 0)
+                    )
+                    else -> oldState
+                }
+            }
             is ArticleLoadedEvent -> {
-                val hasMore = event.articles.size == PAGE_SIZE
-                val ids = oldState.articleIds.toMutableSet()
-                val articles = event.articles.filter { !ids.contains(it.id) }
-                    .onEach { ids.add(it.id) }
-                oldState.copy(
-                    loading = false,
-                    page = event.page,
-                    items = oldState.items.addArticles(articles, hasMore),
-                    articleIds = ids.toSet(),
-                    hasMore = hasMore,
-                )
+                if(event.refreshing) {
+                    val hasMore = event.articles.size == PAGE_SIZE
+                    oldState.copy(
+                        isRefreshing = false,
+                        page = 0,
+                        items = emptyList<Item>().addArticles(event.articles, hasMore),
+                        articleIds = event.articles.map { it.id }.toSet(),
+                        hasMore = hasMore
+                    )
+                }
+                else {
+                    val hasMore = event.articles.size == PAGE_SIZE
+                    val ids = oldState.articleIds.toMutableSet()
+                    val articles = event.articles.filter { !ids.contains(it.id) }
+                        .onEach { ids.add(it.id) }
+                    oldState.copy(
+                        loading = false,
+                        page = event.page,
+                        items = oldState.items.addArticles(articles, hasMore),
+                        articleIds = ids.toSet(),
+                        hasMore = hasMore,
+                    )
+                }
             }
         }
     }

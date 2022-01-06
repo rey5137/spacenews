@@ -1,8 +1,8 @@
 package com.rey.spacenews
 
-import com.rey.spacenews.app.data.NewsRepositoryImpl
+import com.rey.spacenews.app.data.ContentRepositoryImpl
 import com.rey.spacenews.app.data.SpaceFlightNewsApi
-import com.rey.spacenews.app.repository.NewsRepository
+import com.rey.spacenews.app.repository.ContentRepository
 import com.rey.spacenews.common.initializer.KoinInitializer
 import com.squareup.moshi.Moshi
 import okhttp3.OkHttpClient
@@ -37,8 +37,8 @@ private val app = module {
         get<Retrofit>().create(SpaceFlightNewsApi::class.java)
     }
 
-    single<NewsRepository> {
-        NewsRepositoryImpl(get())
+    single<ContentRepository> {
+        ContentRepositoryImpl(get())
     }
 
 }

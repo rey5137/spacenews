@@ -1,12 +1,12 @@
 package com.rey.spacenews.app.feature.home.contract
 
-import com.rey.spacenews.app.repository.entity.Article
+import com.rey.spacenews.app.repository.entity.Content
 import com.rey.spacenews.common.mvs.Event
 
 sealed interface HomeScreenEvent : Event
 
-data class ArticleLoadingEvent(val page: Int, val refreshing: Boolean): HomeScreenEvent
+data class ContentLoadingEvent(val page: Int, val refreshing: Boolean): HomeScreenEvent
 
-data class ArticleLoadedEvent(val page: Int, val refreshing: Boolean, val articles: List<Article>): HomeScreenEvent {
-    override fun toString() = "ArticleLoadedEvent(page=$page, num=${articles.size})"
+data class ContentLoadedEvent(val page: Int, val refreshing: Boolean, val contents: List<Content>): HomeScreenEvent {
+    override fun toString() = "ContentLoadedEvent(page=$page, num=${contents.size})"
 }

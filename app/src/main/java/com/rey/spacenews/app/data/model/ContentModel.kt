@@ -1,6 +1,6 @@
 package com.rey.spacenews.app.data.model
 
-data class ArticleModel(
+data class ContentModel(
     val id: Int,
     val title: String,
     val url: String,

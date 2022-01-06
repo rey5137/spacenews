@@ -12,7 +12,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Newton" >
+        android:theme="@style/Theme.SpaceNews" >
 
         <activity android:name="com.rey.spacenews.MainActivity"
             android:exported="true">

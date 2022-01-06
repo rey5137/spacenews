@@ -4,12 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,6 +25,7 @@ import com.bluelinelabs.conductor.Controller
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.rey.spacenews.app.feature.home.contract.*
+import com.rey.spacenews.app.repository.entity.ContentType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,7 +48,12 @@ import kotlin.math.roundToInt
 class HomeController : Controller(), KoinComponent {
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val store = HomeStore(repository = get(), scope = scope, context = Dispatchers.Default)
+    private val store = HomeStore(
+        repository = get(),
+        contentType = ContentType.BLOG,
+        scope = scope,
+        context = Dispatchers.Default
+    )
 
     private val dateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
 
@@ -65,7 +66,7 @@ class HomeController : Controller(), KoinComponent {
         val isRefreshing = store.states.map { it.isRefreshing }.distinctUntilChanged()
         val view = ComposeView(container.context).apply {
             setContent {
-                homeScreen(items, isRefreshing)
+                articleList(items, isRefreshing)
             }
         }
         store.dispatch(LoadMoreCommand)
@@ -74,17 +75,6 @@ class HomeController : Controller(), KoinComponent {
 
     override fun onDestroy() {
         scope.cancel()
-    }
-
-    @Composable
-    fun homeScreen(items: Flow<List<Item>>, isRefreshing: Flow<Boolean>) {
-        MaterialTheme {
-            Scaffold { contentPadding ->
-                Box(modifier = Modifier.padding(contentPadding)) {
-                    articleList(items, isRefreshing)
-                }
-            }
-        }
     }
 
     @Composable
@@ -99,7 +89,6 @@ class HomeController : Controller(), KoinComponent {
         ) {
             LazyColumn(modifier = Modifier.fillMaxHeight(), state = listState) {
                 items(itemState.value, key = { it.id }) { item ->
-                    Modifier.fillParentMaxHeight()
                     when (item) {
                         is LoadingItem -> loadingItem(
                             itemModifier = if (item.firstTime) Modifier.fillParentMaxHeight()
@@ -107,12 +96,12 @@ class HomeController : Controller(), KoinComponent {
                             indicatorModifier = if (item.firstTime) Modifier.size(64.dp)
                             else Modifier.size(48.dp)
                         )
-                        is ArticleItem -> articleItem(
-                            id = item.article.id,
-                            title = item.article.title,
-                            image = item.article.image,
-                            site = item.article.site,
-                            publishedDateTime = item.article.publishedDateTime,
+                        is ContentItem -> articleItem(
+                            id = item.content.id,
+                            title = item.content.title,
+                            image = item.content.image,
+                            site = item.content.site,
+                            publishedDateTime = item.content.publishedDateTime,
                         )
                     }
                 }
@@ -185,7 +174,7 @@ class HomeController : Controller(), KoinComponent {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         text = site,
-                        style = MaterialTheme.typography.caption
+                        style = MaterialTheme.typography.overline
                     )
                     Text(
                         modifier = Modifier

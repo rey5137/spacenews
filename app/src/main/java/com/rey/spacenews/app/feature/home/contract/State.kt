@@ -6,7 +6,7 @@ data class HomeScreenState(
     val page: Int = -1,
     val loading: Boolean = false,
     val items: List<Item> = emptyList(),
-    val articleIds: Set<Int> = emptySet(),
+    val contentIds: Set<Int> = emptySet(),
     val hasMore: Boolean = true,
     val isRefreshing: Boolean = false,
 ) : State

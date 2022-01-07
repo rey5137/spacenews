@@ -11,26 +11,28 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.*
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import com.bluelinelabs.conductor.Controller
+import com.google.accompanist.pager.*
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import com.rey.spacenews.MainActivity
+import com.rey.spacenews.R
 import com.rey.spacenews.app.feature.home.contract.*
 import com.rey.spacenews.app.repository.entity.ContentType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.koin.core.component.KoinComponent
@@ -44,15 +46,30 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 
+@ExperimentalPagerApi
 @ExperimentalMaterialApi
 class HomeController : Controller(), KoinComponent {
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val store = HomeStore(
-        repository = get(),
-        contentType = ContentType.BLOG,
-        scope = scope,
-        context = Dispatchers.Default
+    private val stores = mapOf(
+        ContentType.ARTICLE to HomeStore(
+            repository = get(),
+            contentType = ContentType.ARTICLE,
+            scope = scope,
+            context = Dispatchers.Default
+        ),
+        ContentType.BLOG to HomeStore(
+            repository = get(),
+            contentType = ContentType.BLOG,
+            scope = scope,
+            context = Dispatchers.Default
+        ),
+        ContentType.REPORT to HomeStore(
+            repository = get(),
+            contentType = ContentType.REPORT,
+            scope = scope,
+            context = Dispatchers.Default
+        )
     )
 
     private val dateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -62,41 +79,97 @@ class HomeController : Controller(), KoinComponent {
         container: ViewGroup,
         savedViewState: Bundle?
     ): View {
-        val items = store.states.map { it.items }
-        val isRefreshing = store.states.map { it.isRefreshing }.distinctUntilChanged()
-        val view = ComposeView(container.context).apply {
+        return ComposeView(container.context).apply {
             setContent {
-                articleList(items, isRefreshing)
+                HomeScreen()
             }
         }
-        store.dispatch(LoadMoreCommand)
-        return view
     }
 
     override fun onDestroy() {
         scope.cancel()
     }
 
+
     @Composable
-    fun articleList(items: Flow<List<Item>>, isRefreshing: Flow<Boolean>) {
+    fun HomeScreen() {
+        val pagerState = rememberPagerState()
+        val contentTypes = ContentType.values()
+
+        Column {
+            TopBar(pagerState)
+            HorizontalPager(
+                count = contentTypes.size,
+                state = pagerState,
+            ) { page -> ContentList(store = stores[contentTypes[page]]!!) }
+        }
+
+    }
+
+    @Composable
+    fun TopBar(pagerState: PagerState) {
+        val scope = rememberCoroutineScope()
+        Surface(elevation = 4.dp) {
+            Column {
+                TopAppBar(
+                    elevation = 0.dp,
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { (activity as MainActivity).openDrawer() } }) {
+                            Icon(Icons.Filled.Menu, null)
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = stringResource(id = R.string.app_name)
+                        )
+                    },
+                )
+                TabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.Indicator(
+                            Modifier.pagerTabIndicatorOffset(
+                                pagerState,
+                                tabPositions
+                            )
+                        )
+                    },
+                ) {
+                    ContentType.values().forEachIndexed { index, contentType ->
+                        Tab(
+                            text = { Text(contentType.name) },
+                            selected = pagerState.currentPage == index,
+                            onClick = { scope.launch { pagerState.scrollToPage(index) } },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun ContentList(store: HomeStore) {
         val listState = rememberLazyListState()
-        val itemState = items.collectAsState(initial = emptyList())
-        val refreshingState by isRefreshing.collectAsState(initial = false)
+
+        val itemState = store.states.map { it.items }.collectAsState(initial = emptyList())
+        val refreshingState = store.states.map { it.isRefreshing }.distinctUntilChanged()
+            .collectAsState(initial = false)
+
 
         SwipeRefresh(
-            state = rememberSwipeRefreshState(refreshingState),
+            state = rememberSwipeRefreshState(refreshingState.value),
             onRefresh = { store.dispatch(RefreshCommand) },
         ) {
             LazyColumn(modifier = Modifier.fillMaxHeight(), state = listState) {
-                items(itemState.value, key = { it.id }) { item ->
+                items(items = itemState.value, key = { it.id }) { item ->
                     when (item) {
-                        is LoadingItem -> loadingItem(
+                        is LoadingItem -> LoadingItem(
                             itemModifier = if (item.firstTime) Modifier.fillParentMaxHeight()
                             else Modifier.height(96.dp),
                             indicatorModifier = if (item.firstTime) Modifier.size(64.dp)
                             else Modifier.size(48.dp)
                         )
-                        is ContentItem -> articleItem(
+                        is ContentItem -> ContentItem(
                             id = item.content.id,
                             title = item.content.title,
                             image = item.content.image,
@@ -110,7 +183,7 @@ class HomeController : Controller(), KoinComponent {
         val loadMoreReached by remember {
             derivedStateOf {
                 val lastIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-                lastIndex >= listState.layoutInfo.totalItemsCount - 3 && lastIndex > 1
+                lastIndex >= listState.layoutInfo.totalItemsCount - 3
             }
         }
 
@@ -121,7 +194,7 @@ class HomeController : Controller(), KoinComponent {
     }
 
     @Composable
-    fun loadingItem(itemModifier: Modifier, indicatorModifier: Modifier) {
+    fun LoadingItem(itemModifier: Modifier, indicatorModifier: Modifier) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = itemModifier.fillMaxWidth()
@@ -131,7 +204,7 @@ class HomeController : Controller(), KoinComponent {
     }
 
     @Composable
-    fun articleItem(
+    fun ContentItem(
         id: Int,
         title: String,
         image: String,

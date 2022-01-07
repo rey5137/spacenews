@@ -123,6 +123,8 @@ object Libs {
         private const val domain = "com.google.accompanist"
         const val VERSION = "0.20.3"
         const val SWIPE_REFRESH = "$domain:accompanist-swiperefresh:$VERSION"
+        const val PAGER = "$domain:accompanist-pager:$VERSION"
+        const val PAGER_INDICATORS = "$domain:accompanist-pager-indicators:$VERSION"
     }
 
     object Conductor {

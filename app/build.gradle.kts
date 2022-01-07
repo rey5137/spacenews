@@ -71,6 +71,8 @@ dependencies {
     implementation(Libs.ComposeUI.MATERIAL_ICONS_EXTENDED)
     implementation(Libs.ComposeUI.ACTIVITY)
     implementation(Libs.Accompanist.SWIPE_REFRESH)
+    implementation(Libs.Accompanist.PAGER)
+    implementation(Libs.Accompanist.PAGER_INDICATORS)
 
     implementation(Libs.Conductor.CORE)
     implementation(Libs.Common.TIMBER)
